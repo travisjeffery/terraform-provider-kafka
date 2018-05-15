@@ -1,0 +1,11 @@
+peers.json
+store.db
+vendor/*
+!vendor/vendor.json
+.idea
+*.log
+*.index
+NOTES.org
+.dir-locals.el
+.#*
+.DS_Store
