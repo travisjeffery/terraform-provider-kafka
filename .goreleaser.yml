@@ -1,0 +1,13 @@
+snapshot:
+  name_template: SNAPSHOT-{{.Commit}}
+
+builds:
+  - main: main.go
+    binary: terraform-provider-kafka
+    goos:
+      - darwin
+      - linux
+      - windows
+      - freebsd
+    goarch:
+      - amd64

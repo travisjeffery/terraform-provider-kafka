@@ -2,6 +2,9 @@ package topic
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"strings"
 
 	"github.com/Shopify/sarama"
 	"github.com/hashicorp/terraform/helper/schema"
@@ -14,24 +17,32 @@ func Provider() terraform.ResourceProvider {
 		Schema: map[string]*schema.Schema{
 			"hosts": {
 				Type:        schema.TypeList,
-				Required:    true,
+				Elem:        &schema.Schema{Type: schema.TypeString},
+				Optional:    true,
 				Description: "Your Kafka host addresses.",
+				DefaultFunc: func() (interface{}, error) {
+					return getHosts()
+				},
 			},
 			"tls_enable": {
 				Type:        schema.TypeBool,
 				Description: "Whether or not to use TLS when connecting to the broker.",
+				Optional:    true,
 			},
 			"sasl_enable": {
 				Type:        schema.TypeBool,
 				Description: "Whether or not to use SASL auth when connecting to the broker.",
+				Optional:    true,
 			},
 			"sasl_username": {
 				Type:        schema.TypeString,
 				Description: "Username for SASL/Plain authentication.",
+				Optional:    true,
 			},
 			"sasl_password": {
 				Type:        schema.TypeString,
 				Description: "Password for SASL/Plain authentication.",
+				Optional:    true,
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
@@ -43,6 +54,7 @@ func Provider() terraform.ResourceProvider {
 
 func configure(d *schema.ResourceData) (interface{}, error) {
 	cfg := sarama.NewConfig()
+	cfg.Version = sarama.V0_11_0_0
 
 	if v, ok := d.GetOk("tls_enable"); ok {
 		cfg.Net.TLS.Enable = v.(bool)
@@ -60,10 +72,29 @@ func configure(d *schema.ResourceData) (interface{}, error) {
 		cfg.Net.SASL.Password = v.(string)
 	}
 
-	client, err := sarama.NewClient(d.Get("hosts").([]string), cfg)
+	var hosts []string
+	for _, host := range d.Get("hosts").([]interface{}) {
+		hosts = append(hosts, host.(string))
+	}
+	if hosts == nil {
+		hosts, _ = getHosts()
+	}
+
+	log.Printf("[INFO] Initializing Kafka client with hosts: %v\n", hosts)
+
+	client, err := sarama.NewClient(hosts, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka client: %s", err)
 	}
 
 	return client, nil
+}
+
+func getHosts() ([]string, error) {
+	hosts := os.Getenv("KAFKA_HOSTS")
+	log.Printf("[INFO] hosts: %v\n", hosts)
+	if hosts == "" {
+		return []string{}, nil
+	}
+	return strings.Split(hosts, ","), nil
 }

@@ -3,6 +3,8 @@
 This is a [Terraform][terraform] provider for managing the Kafka topics with
 Terraform.
 
+Why use this Kafka provider over others? This provider uses Kafka's new admin APIs rather than
+shelling out to old bash scripts.
 
 ## Installation
 
@@ -14,7 +16,7 @@ Terraform.
 
     ```sh
     $ mkdir -p $HOME/.terraform.d/plugins
-    $ mv terraform-provider-kafka-topic $HOME/.terraform.d/plugins/terraform-provider-kafka-topic
+    $ mv terraform-provider-kafka $HOME/.terraform.d/plugins/terraform-provider-kafka
     ```
 
 1. Create your Terraform configurations as normal, and run `terraform init`:
@@ -32,10 +34,14 @@ Terraform.
 
     ```hcl
     resource "kafka_topic" "example" {
-      name     = "example"
-      num_partitions = "8"
-      replication_factor = "3"
-    }
+	  name: "example"
+	  num_partitions: "8"
+	  replication_factor: "1"
+	  config_entries: {
+        "retention.bytes": = 102400
+	    "cleanup.policy": "compact"
+	  }
+	}
     ```
 
 1. Run `terraform init` to pull in the provider:
@@ -56,18 +62,6 @@ Terraform.
 
 For more examples, please see the [examples][examples] folder in this
 repository.
-
-## Reference
-
-### Filesystem Reader
-
-#### Usage
-
-```hcl
-resource "filesystem_file_reader" "read" {
-  path = "my-file.txt"
-}
-```
 
 ## License
 

@@ -2,6 +2,7 @@ package topic
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/hashicorp/terraform/helper/schema"
@@ -35,7 +36,8 @@ func resource() *schema.Resource {
 			"config_entries": &schema.Schema{
 				Type:        schema.TypeMap,
 				Description: "Config entries.",
-				Required:    false,
+				Optional:    true,
+				Computed:    true,
 			},
 		},
 	}
@@ -47,13 +49,15 @@ func create(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	topic := d.Get("topic").(string)
+	topic := d.Get("name").(string)
 
 	topicDetail := &sarama.TopicDetail{}
-	topicDetail.NumPartitions = d.Get("num_partitions").(int32)
-	topicDetail.ReplicationFactor = d.Get("replication_factor").(int16)
-	for name, value := range d.Get("config_entries").(map[string]string) {
-		topicDetail.ConfigEntries[name] = &value
+	topicDetail.NumPartitions = int32(d.Get("num_partitions").(int))
+	topicDetail.ReplicationFactor = int16(d.Get("replication_factor").(int))
+
+	for name, value := range d.Get("config_entries").(map[string]interface{}) {
+		strval := value.(string)
+		topicDetail.ConfigEntries[name] = &strval
 	}
 
 	topicDetails := make(map[string]*sarama.TopicDetail)
@@ -61,13 +65,23 @@ func create(d *schema.ResourceData, meta interface{}) error {
 
 	response, err := c.CreateTopics(&sarama.CreateTopicsRequest{
 		TopicDetails: topicDetails,
+		Timeout:      time.Second * 3,
 	})
 	if err != nil || response.TopicErrors == nil {
 		return err
 	}
-	if err := response.TopicErrors[topic]; err != nil {
-		return fmt.Errorf("topic error: %s", err.ErrMsg)
+	if err := response.TopicErrors[topic]; err.Err != sarama.ErrNoError {
+		return fmt.Errorf("topic error: %v", err)
 	}
+
+	cfgs, err := configs(c, topic)
+	if err != nil {
+		return err
+	}
+	d.Set("config_entries", cfgs)
+
+	d.SetId(topic)
+
 	return nil
 }
 
@@ -77,7 +91,7 @@ func read(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	metadata, err := c.GetMetadata(&sarama.MetadataRequest{Topics: []string{d.Get("topic").(string)}})
+	metadata, err := c.GetMetadata(&sarama.MetadataRequest{Topics: []string{d.Get("name").(string)}})
 	if err != nil {
 		return err
 	}
@@ -91,32 +105,11 @@ func read(d *schema.ResourceData, meta interface{}) error {
 	d.Set("num_partitions", len(topic.Partitions))
 	d.Set("replication_factor", len(topic.Partitions[0].Replicas)) // this work?
 
-	response, err := c.DescribeConfigs(&sarama.DescribeConfigsRequest{
-		Resources: []*sarama.ConfigResource{{
-			Type: sarama.TopicResource,
-			Name: topic.Name,
-		}}},
-	)
+	cfgs, err := configs(c, topic.Name)
 	if err != nil {
 		return err
 	}
-	if len(response.Resources) != 1 {
-		return fmt.Errorf("expected 1 resource in response")
-	}
-	resource := response.Resources[0]
-	if resource.ErrorCode != int16(sarama.ErrNoError) {
-		return fmt.Errorf(
-			"resource error: code: %d, message: %s",
-			resource.ErrorCode,
-			resource.ErrorMsg,
-		)
-	}
-
-	configs := make(map[string]string)
-	for _, config := range resource.Configs {
-		configs[config.Name] = config.Value
-	}
-	d.Set("config_entries", configs)
+	d.Set("config_entries", cfgs)
 
 	return nil
 }
@@ -127,10 +120,11 @@ func delete(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	topic := d.Get("topic").(string)
+	topic := d.Get("name").(string)
 
 	response, err := c.DeleteTopics(&sarama.DeleteTopicsRequest{
-		Topics: []string{topic},
+		Topics:  []string{topic},
+		Timeout: time.Second * 3,
 	})
 	if err != nil || response.TopicErrorCodes == nil {
 		return err
@@ -143,5 +137,47 @@ func delete(d *schema.ResourceData, meta interface{}) error {
 
 func client(meta interface{}) (*sarama.Broker, error) {
 	client := meta.(sarama.Client)
-	return client.Controller()
+	controller, err := client.Controller()
+	if err != nil {
+		return nil, err
+	}
+	if ok, err := controller.Connected(); err != nil {
+		return nil, err
+	} else if ok {
+		return controller, nil
+	}
+	if err = controller.Open(client.Config()); err != nil {
+		return nil, err
+	}
+	return controller, nil
+}
+
+func configs(c *sarama.Broker, topic string) (map[string]string, error) {
+	response, err := c.DescribeConfigs(&sarama.DescribeConfigsRequest{
+		Resources: []*sarama.ConfigResource{{
+			Type: sarama.TopicResource,
+			Name: topic,
+		}}},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(response.Resources) != 1 {
+		return nil, fmt.Errorf("expected 1 resource in response")
+	}
+	resource := response.Resources[0]
+	if resource.ErrorCode != int16(sarama.ErrNoError) {
+		return nil, fmt.Errorf(
+			"resource error: code: %d, message: %s",
+			resource.ErrorCode,
+			resource.ErrorMsg,
+		)
+	}
+
+	configs := make(map[string]string)
+	for _, config := range resource.Configs {
+		configs[config.Name] = config.Value
+	}
+
+	return configs, nil
 }

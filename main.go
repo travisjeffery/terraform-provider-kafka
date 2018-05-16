@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/hashicorp/terraform/plugin"
-	"github.com/sethvargo/terraform-provider-kafka-topic/topic"
+	"github.com/travisjeffery/terraform-provider-kafka/topic"
 )
 
 func main() {
