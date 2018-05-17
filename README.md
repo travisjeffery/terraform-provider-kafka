@@ -1,6 +1,6 @@
 # Terraform Kafka Topic Provider
 
-This is a Terraform provider for managing the Kafka topics with
+This is a Terraform provider for managing Kafka topics with
 Terraform.
 
 Why use this Kafka provider?
