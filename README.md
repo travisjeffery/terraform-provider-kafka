@@ -3,9 +3,12 @@
 This is a [Terraform][terraform] provider for managing the Kafka topics with
 Terraform.
 
-Why use this Kafka provider over others? This provider uses Kafka's new admin APIs rather than
-shelling out to old bash scripts. This provider also supports adding partitions and altering
-configs.
+Why use this Kafka provider over others?
+
+- Uses Kafka's new admin APIs rather than
+shelling out to old bash scripts
+- Supports adding partitions and altering
+configs
 
 ## Installation
 
