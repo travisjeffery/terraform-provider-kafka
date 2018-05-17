@@ -54,7 +54,7 @@ func Provider() terraform.ResourceProvider {
 
 func configure(d *schema.ResourceData) (interface{}, error) {
 	cfg := sarama.NewConfig()
-	cfg.Version = sarama.V0_11_0_0
+	cfg.Version = sarama.V1_0_0_0
 
 	if v, ok := d.GetOk("tls_enable"); ok {
 		cfg.Net.TLS.Enable = v.(bool)
