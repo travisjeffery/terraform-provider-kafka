@@ -1,18 +1,17 @@
 # Terraform Kafka Topic Provider
 
-This is a [Terraform][terraform] provider for managing the Kafka topics with
+This is a Terraform provider for managing the Kafka topics with
 Terraform.
 
-Why use this Kafka provider over others?
+Why use this Kafka provider?
 
-- Uses Kafka's new admin APIs rather than
-shelling out to old bash scripts
-- Supports adding partitions and altering
-configs
+- Supports adding partitions and altering configs
+- Supports TLS/SASL
+- Uses Kafka's new admin APIs rather than shelling out to old bash scripts
 
 ## Installation
 
-1. Download the latest compiled binary from [GitHub releases][releases].
+1. Download the latest compiled binary from [GitHub releases](https://github.com/travisjeffery/terraform-provider-kafka/releases).
 
 1. Unzip/untar the archive.
 
@@ -70,7 +69,7 @@ configs
 
 ## Examples
 
-For more examples, please see the [examples][examples] folder in this
+For more examples, please see the [examples](https://github.com/travisjeffery/terraform-provider-kafka/tree/master/examples) folder in this
 repository.
 
 ## License
