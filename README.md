@@ -45,7 +45,7 @@ Why use this Kafka provider?
 		num_partitions: "8"
 		replication_factor: "1"
 		config_entries: {
-			retention.bytes": "102400"
+			retention.bytes: "102400"
 			cleanup.policy: "compact
 		}
 	}
