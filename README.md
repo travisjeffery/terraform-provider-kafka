@@ -52,6 +52,8 @@ configs
 	}
     ```
 
+    [There's parameters to set if you use TLS/SASL](https://github.com/travisjeffery/terraform-provider-kafka/blob/58dfc2e47748eb6a4f817a3e93d9848c1668c164/topic/provider.go#L18-L46).
+
 1. Run `terraform init` to pull in the provider:
 
     ```sh
