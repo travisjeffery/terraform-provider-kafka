@@ -67,6 +67,14 @@ Why use this Kafka provider?
     $ terraform apply
     ```
 
+## Importing topics
+
+This provider supports importing externally created topics by their name. Assuming you've already created a topic declaration like the one above, you can get Terraform to manage the state of the existing topic:
+
+```sh
+$ terraform import kafka_topic.example example
+```
+
 ## Examples
 
 For more examples, please see the [examples](https://github.com/travisjeffery/terraform-provider-kafka/tree/master/examples) folder in this
