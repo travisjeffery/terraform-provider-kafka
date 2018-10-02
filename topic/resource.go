@@ -215,7 +215,9 @@ func importTopic(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceDa
 }
 
 func client(meta interface{}) (*sarama.Broker, error) {
-	client := meta.(sarama.Client)
+	client := meta.(*threadsafeClient)
+	client.Lock()
+	defer client.Unlock()
 	controller, err := client.Controller()
 	if err != nil {
 		return nil, err
