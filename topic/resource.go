@@ -10,10 +10,11 @@ import (
 
 func resource() *schema.Resource {
 	return &schema.Resource{
-		Create: create,
-		Update: update,
-		Read:   read,
-		Delete: delete,
+		Create:   create,
+		Update:   update,
+		Read:     read,
+		Delete:   delete,
+		Importer: &schema.ResourceImporter{State: importTopic},
 
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
@@ -206,8 +207,17 @@ func delete(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
+func importTopic(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+	if err := read(d, meta); err != nil {
+		return nil, err
+	}
+	return []*schema.ResourceData{d}, nil
+}
+
 func client(meta interface{}) (*sarama.Broker, error) {
-	client := meta.(sarama.Client)
+	client := meta.(*threadsafeClient)
+	client.Lock()
+	defer client.Unlock()
 	controller, err := client.Controller()
 	if err != nil {
 		return nil, err
