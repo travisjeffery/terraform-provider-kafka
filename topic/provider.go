@@ -1,7 +1,6 @@
 package topic
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/terraform"
+	"github.com/pkg/errors"
 )
 
 type threadsafeClient struct {
@@ -90,7 +90,7 @@ func configure(d *schema.ResourceData) (interface{}, error) {
 
 	client, err := sarama.NewClient(hosts, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create kafka client: %s", err)
+		return nil, errors.Wrap(err, "failed to create kafka client")
 	}
 
 	return &threadsafeClient{client, new(sync.Mutex)}, nil

@@ -1,11 +1,11 @@
 package topic
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/pkg/errors"
 )
 
 func resource() *schema.Resource {
@@ -76,7 +76,7 @@ func create(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 	if err := response.TopicErrors[topic]; err.Err != sarama.ErrNoError {
-		return fmt.Errorf("topic error: %v", err)
+		return errors.Errorf("topic error: %v", err)
 	}
 
 	return read(d, meta)
@@ -91,13 +91,13 @@ func update(d *schema.ResourceData, meta interface{}) error {
 	topic := d.Get("name").(string)
 
 	if d.HasChange("replication_factor") {
-		return fmt.Errorf("can't update the replication factor currently")
+		return errors.Errorf("can't update the replication factor currently")
 	}
 
 	if d.HasChange("num_partitions") {
 		old, new := d.GetChange("num_partitions")
 		if new.(int) < old.(int) {
-			return fmt.Errorf("new num_partitions must be >= old num_partitions")
+			return errors.Errorf("new num_partitions must be >= old num_partitions")
 		}
 		response, err := c.CreatePartitions(&sarama.CreatePartitionsRequest{
 			Timeout: time.Second * 15,
@@ -111,7 +111,7 @@ func update(d *schema.ResourceData, meta interface{}) error {
 			return err
 		}
 		if err := response.TopicPartitionErrors[topic]; err.Err != sarama.ErrNoError {
-			return fmt.Errorf("topic partition error: %v", err)
+			return errors.Errorf("topic partition error: %v", err)
 		}
 	}
 
@@ -137,7 +137,7 @@ func update(d *schema.ResourceData, meta interface{}) error {
 		}
 		for _, resource := range response.Resources {
 			if resource.ErrorCode != int16(sarama.ErrNoError) {
-				return fmt.Errorf(
+				return errors.Errorf(
 					"resource error: code: %d, message: %s",
 					resource.ErrorCode,
 					resource.ErrorMsg,
@@ -160,14 +160,27 @@ func read(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 	if len(metadata.Topics) != 1 {
-		return fmt.Errorf("expected 1 topic in metadata")
+		return errors.Errorf("expected 1 topic in metadata")
 	}
 
 	topic := metadata.Topics[0]
+	if topic.Err == sarama.ErrUnknownTopicOrPartition {
+		d.SetId("")
+		return nil
+	} else if topic.Err != sarama.ErrNoError {
+		return topic.Err
+	}
 
 	d.Set("name", topic.Name)
-	d.Set("num_partitions", len(topic.Partitions))
-	d.Set("replication_factor", len(topic.Partitions[0].Replicas)) // this work?
+
+	numPartitions := len(topic.Partitions)
+	d.Set("num_partitions", numPartitions)
+
+	replicationFactor := 0
+	if numPartitions > 0 {
+		replicationFactor = len(topic.Partitions[0].Replicas)
+	}
+	d.Set("replication_factor", replicationFactor)
 
 	if old, ok := d.GetOk("config_entries"); ok {
 		read, err := configs(c, topic.Name)
@@ -202,8 +215,9 @@ func delete(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 	if errCode := response.TopicErrorCodes[topic]; errCode != sarama.ErrNoError {
-		return fmt.Errorf("topic error code: %s", errCode)
+		return errors.Errorf("topic error code: %s", errCode)
 	}
+
 	return nil
 }
 
@@ -218,17 +232,18 @@ func client(meta interface{}) (*sarama.Broker, error) {
 	client := meta.(*threadsafeClient)
 	client.Lock()
 	defer client.Unlock()
+
 	controller, err := client.Controller()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "could not create controller")
 	}
 	if ok, err := controller.Connected(); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "could not check for controller connectedness")
 	} else if ok {
 		return controller, nil
 	}
 	if err = controller.Open(client.Config()); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "could not open controller connection")
 	}
 	return controller, nil
 }
@@ -241,14 +256,14 @@ func configs(c *sarama.Broker, topic string) (map[string]string, error) {
 		}}},
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "could not describe topic config")
 	}
 	if len(response.Resources) != 1 {
-		return nil, fmt.Errorf("expected 1 resource in response")
+		return nil, errors.Errorf("expected 1 resource in response")
 	}
 	resource := response.Resources[0]
 	if resource.ErrorCode != int16(sarama.ErrNoError) {
-		return nil, fmt.Errorf(
+		return nil, errors.Errorf(
 			"resource error: code: %d, message: %s",
 			resource.ErrorCode,
 			resource.ErrorMsg,
