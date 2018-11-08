@@ -222,9 +222,12 @@ func delete(d *schema.ResourceData, meta interface{}) error {
 }
 
 func importTopic(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+	d.Set("name", d.Id())
+
 	if err := read(d, meta); err != nil {
 		return nil, err
 	}
+
 	return []*schema.ResourceData{d}, nil
 }
 
