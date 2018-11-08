@@ -10,11 +10,13 @@ import (
 
 func resource() *schema.Resource {
 	return &schema.Resource{
-		Create:   create,
-		Update:   update,
-		Read:     read,
-		Delete:   delete,
-		Importer: &schema.ResourceImporter{State: importTopic},
+		Create: create,
+		Update: update,
+		Read:   read,
+		Delete: delete,
+		Importer: &schema.ResourceImporter{
+			State: schema.ImportStatePassthrough,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
@@ -53,8 +55,6 @@ func create(d *schema.ResourceData, meta interface{}) error {
 
 	topic := d.Get("name").(string)
 
-	d.SetId(topic)
-
 	topicDetail := &sarama.TopicDetail{}
 	topicDetail.NumPartitions = int32(d.Get("num_partitions").(int))
 	topicDetail.ReplicationFactor = int16(d.Get("replication_factor").(int))
@@ -79,6 +79,7 @@ func create(d *schema.ResourceData, meta interface{}) error {
 		return errors.Errorf("topic error: %v", err)
 	}
 
+	d.SetId(topic)
 	return read(d, meta)
 }
 
@@ -88,7 +89,7 @@ func update(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	topic := d.Get("name").(string)
+	topic := d.Id()
 
 	if d.HasChange("replication_factor") {
 		return errors.Errorf("can't update the replication factor currently")
@@ -155,7 +156,7 @@ func read(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	metadata, err := c.GetMetadata(&sarama.MetadataRequest{Topics: []string{d.Get("name").(string)}})
+	metadata, err := c.GetMetadata(&sarama.MetadataRequest{Topics: []string{d.Id()}})
 	if err != nil {
 		return err
 	}
@@ -205,7 +206,7 @@ func delete(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	topic := d.Get("name").(string)
+	topic := d.Id()
 
 	response, err := c.DeleteTopics(&sarama.DeleteTopicsRequest{
 		Topics:  []string{topic},
@@ -219,16 +220,6 @@ func delete(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	return nil
-}
-
-func importTopic(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
-	d.Set("name", d.Id())
-
-	if err := read(d, meta); err != nil {
-		return nil, err
-	}
-
-	return []*schema.ResourceData{d}, nil
 }
 
 func client(meta interface{}) (*sarama.Broker, error) {
