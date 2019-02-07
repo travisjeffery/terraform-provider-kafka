@@ -156,15 +156,7 @@ func read(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	metadata, err := c.GetMetadata(&sarama.MetadataRequest{Topics: []string{d.Id()}})
-	if err != nil {
-		return err
-	}
-	if len(metadata.Topics) != 1 {
-		return errors.Errorf("expected 1 topic in metadata")
-	}
-
-	topic := metadata.Topics[0]
+	topic, err := getTopic(c, d.Id())
 	if topic.Err == sarama.ErrUnknownTopicOrPartition {
 		d.SetId("")
 		return nil
@@ -206,20 +198,39 @@ func delete(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	topic := d.Id()
+	topicName := d.Id()
+	topic, err := getTopic(c, topicName)
+	if topic.Err == sarama.ErrUnknownTopicOrPartition {
+		// The topic is gone on the broker, so we're done.
+		return nil
+	} else if topic.Err != sarama.ErrNoError {
+		return topic.Err
+	}
 
 	response, err := c.DeleteTopics(&sarama.DeleteTopicsRequest{
-		Topics:  []string{topic},
+		Topics:  []string{topicName},
 		Timeout: time.Second * 15,
 	})
 	if err != nil || response.TopicErrorCodes == nil {
 		return err
 	}
-	if errCode := response.TopicErrorCodes[topic]; errCode != sarama.ErrNoError {
+	if errCode := response.TopicErrorCodes[topicName]; errCode != sarama.ErrNoError {
 		return errors.Errorf("topic error code: %s", errCode)
 	}
 
 	return nil
+}
+
+func getTopic(client *sarama.Broker, name string) (*sarama.TopicMetadata, error) {
+	metadata, err := client.GetMetadata(&sarama.MetadataRequest{Topics: []string{name}})
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get topic metadata")
+	}
+	if len(metadata.Topics) != 1 {
+		return nil, errors.Errorf("expected 1 topic in metadata")
+	}
+
+	return metadata.Topics[0], nil
 }
 
 func client(meta interface{}) (*sarama.Broker, error) {
