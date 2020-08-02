@@ -78,12 +78,13 @@ func configure(d *schema.ResourceData) (interface{}, error) {
 		cfg.Net.SASL.Password = v.(string)
 	}
 
-	var hosts []string
-	for _, host := range d.Get("hosts").([]interface{}) {
-		hosts = append(hosts, host.(string))
+	hostsConfig := d.Get("hosts").([]interface{})
+	if hostsConfig == nil || len(hostsConfig) < 1 {
+		hostsConfig, _ = getHosts()
 	}
-	if hosts == nil {
-		hosts, _ = getHosts()
+	var hosts []string
+	for _, host := range hostsConfig {
+		hosts = append(hosts, host.(string))
 	}
 
 	log.Printf("[INFO] Initializing Kafka client with hosts: %v\n", hosts)
@@ -96,11 +97,15 @@ func configure(d *schema.ResourceData) (interface{}, error) {
 	return &threadsafeClient{client, new(sync.Mutex)}, nil
 }
 
-func getHosts() ([]string, error) {
-	hosts := os.Getenv("KAFKA_HOSTS")
+func getHosts() ([]interface{}, error) {
+	hosts := strings.Split(os.Getenv("KAFKA_HOSTS"), ",")
 	log.Printf("[INFO] hosts: %v\n", hosts)
-	if hosts == "" {
-		return []string{}, nil
+	if len(hosts) < 1 {
+		return []interface{}{}, nil
 	}
-	return strings.Split(hosts, ","), nil
+	res := make([]interface{}, len(hosts))
+	for i, v := range hosts {
+		res[i] = v
+	}
+	return res, nil
 }
