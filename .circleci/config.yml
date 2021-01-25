@@ -1,0 +1,25 @@
+version: 2.1
+
+jobs:
+  run_ci:
+    docker:
+      - image: cimg/go:1.14
+
+    steps:
+      - setup_remote_docker
+
+      - checkout
+
+      - run: make build
+
+      - run: gofmt -l
+
+      - run: go vet
+
+      - run: go test -v
+
+workflows:
+  version: 2
+  test_and_build:
+    jobs:
+      - run_ci
