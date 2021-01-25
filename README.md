@@ -1,5 +1,10 @@
 # Terraform Kafka Topic Provider
 
+## Forked
+This repo has been forked from https://github.com/travisjeffery/terraform-provider-kafka
+
+## Description
+
 This is a Terraform provider for managing Kafka topics with
 Terraform.
 
@@ -17,16 +22,16 @@ Why use this Kafka provider?
 
 1. Move it into `$HOME/.terraform.d/plugins`:
 
-    ```sh
-    $ mkdir -p $HOME/.terraform.d/plugins
-    $ mv terraform-provider-kafka $HOME/.terraform.d/plugins/terraform-provider-kafka
-    ```
+```sh
+$ mkdir -p $HOME/.terraform.d/plugins
+$ mv terraform-provider-kafka $HOME/.terraform.d/plugins/terraform-provider-kafka
+```
 
 1. Create your Terraform configurations as normal, and run `terraform init`:
 
-    ```sh
-    $ terraform init
-    ```
+```sh
+$ terraform init
+```
 
     This will find the plugin locally.
 
@@ -35,37 +40,37 @@ Why use this Kafka provider?
 
 1. Create a Terraform configuration file:
 
-    ```hcl
-	provider "kafka" {
-		hosts = ["localhost:9092"]
-	}
+```hcl
+provider "kafka" {
+  hosts = ["localhost:9092"]
+}
 
-	resource "kafka_topic" "example" {
-		name: "example"
-		num_partitions: "8"
-		replication_factor: "1"
-		config_entries: {
-			retention.bytes: "102400"
-			cleanup.policy: "compact
-		}
-	}
-    ```
+resource "kafka_topic" "example" {
+  name: "example"
+  num_partitions: "8"
+  replication_factor: "1"
+  config_entries: {
+      retention.bytes: "102400"
+      cleanup.policy: "compact
+  }
+}
+```
 
-    [There's parameters to set if you use TLS/SASL](https://github.com/travisjeffery/terraform-provider-kafka/blob/58dfc2e47748eb6a4f817a3e93d9848c1668c164/topic/provider.go#L18-L46).
+[There's parameters to set if you use TLS/SASL](https://github.com/travisjeffery/terraform-provider-kafka/blob/58dfc2e47748eb6a4f817a3e93d9848c1668c164/topic/provider.go#L18-L46).
 
 1. Run `terraform init` to pull in the provider:
 
-    ```sh
-    $ terraform init
-    ```
+```sh
+$ terraform init
+```
 
 1. Run `terraform plan` and `terraform apply` to interact with the filesystem:
 
-    ```sh
-    $ terraform plan
+```sh
+$ terraform plan
 
-    $ terraform apply
-    ```
+$ terraform apply
+```
 
 ## Importing topics
 

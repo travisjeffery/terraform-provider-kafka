@@ -1,25 +1,117 @@
-version: 2.1
+global_dockerhub_login: &global_dockerhub_login
+  run:
+    name: Authenticate with hub.docker.com - DockerHub
+    command: docker login -u $GLOBAL_DOCKERHUB_USERNAME -p $GLOBAL_DOCKERHUB_PASSWORD
+global_context: &global_context
+  context:
+    - org-global
+global_remote_docker: &global_remote_docker
+  version: 19.03.13
+global_dockerhub_auth: &global_dockerhub_auth
+  auth:
+    username: $GLOBAL_DOCKERHUB_USERNAME
+    password: $GLOBAL_DOCKERHUB_PASSWORD
+
+defaults: &defaults
+  working_directory: /provider
+  docker:
+    - image: deliveroo/circleci:0.4.2
+      <<: *global_dockerhub_auth
+
+version: 2
+
+x-upload-from-sandbox: &upload-from-sandbox
+  <<: *global_context
+  requires:
+    - test_and_build
+  filters:
+    branches:
+      only:
+        - sandbox
+
+x-upload-from-master: &upload-from-master
+  <<: *global_context
+  requires:
+    - test_and_build
+  filters:
+    branches:
+      only:
+        - master
+
+upload_package: &upload_package
+  <<: *defaults
+
+  steps:
+    - attach_workspace:
+        at: workspace
+
+    - *global_dockerhub_login
+    - setup_remote_docker:
+        version: 19.03.13
+
+    - run:
+        name: Push new provider version
+        command: |
+          `print_env ${TARGET}`
+          set -ex
+          aws s3 cp workspace/artifacts/ ${AWS_S3_REGISTRY_PREFIX}/1.0.0/ --recursive
 
 jobs:
-  run_ci:
-    docker:
-      - image: cimg/go:1.14
+  test_and_build:
+    <<: *defaults
 
     steps:
-      - setup_remote_docker
-
+      - *global_dockerhub_login
+      - setup_remote_docker:
+          docker_layer_caching: true
+          version: 19.03.13
       - checkout
+      - run:
+          name: Make sure we are on HEAD
+          command: ensure_head
+      - run:
+          name: Build image
+          command: docker build --tag provider:latest .
+      - run:
+          name: Run gofmt
+          command: docker run provider:latest gofmt -l .
+      - run:
+          name: Run go vet
+          command: docker run provider:latest go vet
+#      - run:  # DISABLED as tests require a kafka broker to be up and running
+#          name: Run tests
+#          command: docker run provider:latest go test -v ./...
+      - run:
+          name: Save zipped binary to the workspace
+          command: |
+            set -ex
+            mkdir -p workspace
+            docker run --name build-container provider:latest ./build.sh "${CIRCLE_PROJECT_REPONAME}" 1.0.0
+            docker cp "build-container:/project/artifacts" "workspace/"
+      - persist_to_workspace:
+          root: workspace
+          paths:
+            - "artifacts"
 
-      - run: make build
+  publish_sandbox:
+    <<: *upload_package
+    environment:
+      TARGET: sandbox
 
-      - run: gofmt -l
+  publish_platform:
+    <<: *upload_package
+    environment:
+      TARGET: platform
 
-      - run: go vet
-
-      - run: go test -v
 
 workflows:
   version: 2
   test_and_build:
     jobs:
-      - run_ci
+      - test_and_build:
+          <<: *global_context
+      - publish_sandbox:
+          <<: *upload-from-sandbox
+
+      - publish_platform:
+          <<: *upload-from-master

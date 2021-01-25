@@ -1,4 +1,4 @@
-module github.com/travisjeffery/terraform-provider-kafka
+module github.com/deliveroo/terraform-provider-kafka
 
 require (
 	github.com/Shopify/sarama v0.0.0-20180507145726-3c763ff04e6d
